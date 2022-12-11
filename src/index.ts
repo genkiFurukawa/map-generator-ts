@@ -1,11 +1,12 @@
 import { calcTileCoordinate } from './utils';
+import * as sharp from 'sharp';
 // import fetch from 'node-fetch';
 // import * as fs from 'fs';
 
 const downloadFile = async (x: number, y: number, z: number, callback: Function) => {
     // const url = `https://cyberjapandata.gsi.go.jp/xyz/airphoto/${z}/${x}/${y}.png`;
     const url = `https://cyberjapandata.gsi.go.jp/xyz/ort/${z}/${x}/${y}.jpg`;
-    console.log(`curl -oL ${z}_${y}_${x}.png ${url}`);
+    console.log(`curl -o ${z}_${x}_${y}.jpg ${url}`);
 };
 
 // 鍋割山
@@ -38,10 +39,51 @@ const maxY = tileCoordinate02.y;
 let number = 1;
 for (let x = minX; x < (maxX + 1); x++) {
     for (let y = minY; y < (maxY + 1); y++) {
-        downloadFile(x, y, zoomLevel, () => { console.log('done') });
+        // downloadFile(x, y, zoomLevel, () => { console.log('done') });
+        // console.log(`${zoomLevel}, ${y}, ${x}, ${number}`);
         number++;
     }
 }
-console.log(`number: ${number}`);
 
+const totalNumber = (maxX - minX + 1) * (maxY - minY + 1);
+console.log(`totalNumber: ${totalNumber}`);
 
+console.log(`${process.cwd()}`);
+
+// 無地の画像領域を確保して、画像を配置していく
+const createMap = async ( minX: number, maxX: number, minY: number, maxY: number, zoomLevel: number ) => {
+    console.log(`start`);
+    // 無地の画像を生成
+    console.log(`${(maxX - minX + 1) * 256}, ${(maxY - minY + 1) * 256}`)
+    let img = await sharp({
+        create: {
+            width: (maxX - minX + 1) * 256,
+            height: (maxY - minY + 1) * 256,
+            channels: 4,
+            background: { r: 255, g: 255, b:255, alpha: 0 }
+        }
+    });
+
+    // 画像を埋め込む
+    // img.composite()を繰り返すことで画像を合成したかったが、1枚しかくっつけることができなかったのでリストを作ってまとめて加工した
+    const compositeList: sharp.OverlayOptions[] = [];
+    for (let x = minX; x < (maxX + 1); x++) {
+        for (let y = minY; y < (maxY + 1); y++) {
+            // console.log(`${(x - minX)}, ${(y - minY)}`);
+            console.log(`${(x - minX)}, ${(y - minY)}, ${(x - minX) * 256}, ${(y - minY) * 256}, ${zoomLevel}_${x}_${y}.jpg`);
+            compositeList.push(
+                {
+                    input: `${process.cwd()}/tile_images/${zoomLevel}_${x}_${y}.jpg`,
+                    top: (y - minY) * 256,
+                    left: (x - minX) * 256
+                }
+            );
+        }
+    }
+    await img.composite(compositeList);
+
+    await img.toFile('sample.png');
+    console.log(`done`);
+};
+
+createMap(minX, maxX, minY, maxY, zoomLevel).then();
